@@ -1,0 +1,40 @@
+{
+  "name": "LendLoop \u00b7 automation errors",
+  "nodes": [
+    {
+      "id": "error",
+      "name": "Failed execution",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [200, 240],
+      "parameters": {}
+    },
+    {
+      "id": "visible",
+      "name": "Visible failure \u2014 inspect execution",
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [440, 240],
+      "parameters": {
+        "errorMessage": "=LendLoop workflow failed. Inspect execution {{ $json.execution.id }}; retry after correcting the cause."
+      }
+    }
+  ],
+  "connections": {
+    "Failed execution": {
+      "main": [
+        [
+          {
+            "node": "Visible failure \u2014 inspect execution",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "saveDataErrorExecution": "all"
+  },
+  "active": false
+}

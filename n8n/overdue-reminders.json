@@ -1,0 +1,56 @@
+{
+  "name": "LendLoop \u00b7 daily overdue reminders",
+  "nodes": [
+    {
+      "id": "trigger",
+      "name": "Every morning",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [220, 240],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * *"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "process",
+      "name": "Fetch overdue and record reminders",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 240],
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst secret = $env.AUTOMATION_SECRET;\nif (!secret) throw new Error('AUTOMATION_SECRET is required');\nasync function post(path, data) {\n const body = JSON.stringify(data), timestamp = String(Date.now());\n const signature = crypto.createHmac('sha256', secret).update(timestamp + '.' + body).digest('hex');\n const url = new URL(path, $env.CONVEX_SITE_URL);\n const transport = require(url.protocol === 'https:' ? 'https' : 'http');\n return await new Promise((resolve,reject)=>{\n  const req=transport.request(url,{method:'POST',headers:{'content-type':'application/json','content-length':Buffer.byteLength(body),'x-timestamp':timestamp,'x-signature':signature}},res=>{let result='';res.on('data',chunk=>result+=chunk);res.on('end',()=>{if(res.statusCode<200||res.statusCode>=300)return reject(new Error('Convex HTTP '+res.statusCode));try{resolve(JSON.parse(result))}catch(e){reject(e)}})});\n  req.setTimeout(15000,()=>req.destroy(new Error('Request timeout')));req.on('error',reject);req.end(body);\n });\n}\nconst loans=await post('/automation/overdue',{});\nfor(const loan of loans) await post('/automation/receipt',{key:loan.key,loanId:loan.loanId,kind:'reminder'});\nreturn [{json:{remindersProcessed:loans.length}}];"
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "stopWorkflow"
+    }
+  ],
+  "connections": {
+    "Every morning": {
+      "main": [
+        [
+          {
+            "node": "Fetch overdue and record reminders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "none",
+    "errorWorkflow": "REPLACE_WITH_IMPORTED_ERROR_WORKFLOW_ID"
+  }
+}
